@@ -13,7 +13,7 @@ RUN wget \
     && rm -f Miniconda3-latest-Linux-x86_64.sh
 # make conda activate command available from /bin/bash --interative shells
 RUN conda init bash
-COPY environment_files/* /app/environment_files/*
+COPY environment_files/ /app/environment_files/
 RUN conda env create -f environment_files/base_gpu.yml
 
 
