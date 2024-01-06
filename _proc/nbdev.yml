@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "mhar"
+  site-url: "https://sonder-art.github.io/mhar"
+  description: "mhar_rebuild"
+  repo-branch: released
+  repo-url: "https://github.com/sonder-art/mhar"

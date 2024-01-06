@@ -18,7 +18,7 @@ RUN conda env create -f environment_files/base_gpu.yml
 
 
 ## Development environment
-FROM base as dev
+FROM base as dev  
 RUN conda env create -f environment_files/dev_gpu.yml
 # Quadro
 RUN apt-get -y update
