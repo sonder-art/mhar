@@ -1,5 +1,6 @@
 pandas==2.1.4
 pyarrow==14.0.2
+SciPy==1.11.4 
 --index-url https://download.pytorch.org/whl/cpu
 torch==2.1.2
 nbdev == 2.3.13
