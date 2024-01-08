@@ -41,7 +41,7 @@ def ChebyshevCenter(
                   
     A_in = polytope.A_in.numpy()
     b_in = polytope.b_in.numpy()
-    A_in_norm = np.matrix(np.sum(A_in ** 2., axis=-1) ** (1. / 2.))
+    A_in_norm = np.sqrt(np.sum(A_in**2, axis=-1))[np.newaxis,:]
     # Create new restriction matrices
     A_in_norm = np.concatenate((A_in, A_in_norm.transpose()), axis=1)
     c = np.concatenate((np.zeros(A_in.shape[1]), [-1.]))
