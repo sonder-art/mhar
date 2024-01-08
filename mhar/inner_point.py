@@ -91,10 +91,12 @@ def ChebyshevCenter(
     x0_in = torch.matmul(polytope.A_in.to(device).to(dtype), x0.to(device).to(dtype))
     b_in = torch.from_numpy(b_in).to(device).to(dtype)
     
+    
     assert(torch.all(x0_in <= b_in )), f'Point {x0} does not satisfy A_inx <= b_in restrictions, it may have numerical inestability'
     if mE>0:
         x0_eq = torch.matmul(polytope.A_eq.to(device).to(dtype), x0.to(device).to(dtype))
-        assert(torch.all(torch.abs(x0_eq - b_eq) <= tolerance)), f'Point {x0} does not satisfy A_eqx = b_eq restrictions with tolerance {tolerance}, it may have numerical inestability'
+        b_eq = torch.from_numpy(b_eq).to(device).to(dtype)
+        assert(torch.all(torch.abs(x0_eq - b_eq) <= tolerance)), f'Point {x0} does not satisfy A_eqx = b_eq restrictions with tolerance {tolerance}, it may have numerical inestability. Try improving precision in the polytope and solver.'
     
     polytope.send_to_device(polytope_device)    
     polytope.cast_precision(original_precision)
