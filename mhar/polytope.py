@@ -14,6 +14,9 @@ import warnings
 from fastcore.basics import patch
 
 # %% ../nbs/01_polytope.ipynb 3
+from . import warningss
+
+# %% ../nbs/01_polytope.ipynb 4
 class Polytope:
     
     def __init__(self, 
@@ -25,15 +28,16 @@ class Polytope:
                  ) -> None:
         
         self.dtype = dtype
+        self.device = None
+        
         self._check_dtype_()
-        self._check_intra_constraint_dimension_(A_in,b_in,'Inequality')
+        self._check_intra_constraint_dimensions_(A_in,b_in,'Inequality')
         
         self.copy = copy
         if copy:
             warnings.warn('The object will create a copy of the tensors, so memory usage will increase')
         else:
-            warnings.warn('The object will not create a copy of the tensors, so modifications    will be reflected ')
-            
+            warnings.warn('The object will not create a copy of the tensors, so modifications will be reflected in the object')
 
         if requires_grad:
             warnings.warn('The tensors will accumalate the gradient of the operations')
@@ -41,8 +45,8 @@ class Polytope:
         
         self.mI = A_in.shape[0]
         self.n = A_in.shape[1]        
-        self.A_in = self._process_tensor_or_array(A_in,'A_in')
-        self.b_in = self._process_tensor_or_array(b_in,'b_in')
+        self.A_in = self._process_tensor_or_array_(A_in,'A_in')
+        self.b_in = self._process_tensor_or_array_(b_in,'b_in')
         gc.collect()
     
     
@@ -79,24 +83,35 @@ class Polytope:
             raise ValueError(f"Input {restriction} must be a NumPy array or PyTorch tensor")
 
     def _check_dtype_(self):
-        assert(isinstance(self.dtype, torch.float16) or isinstance(self.dtype, torch.float32) or isinstance(self.dtype, torch.float64)), f'{self.dtype} is not a PyTorch float data type.'
+        valid_dtypes = (torch.float16, torch.float32, torch.float64)
+        assert self.dtype in valid_dtypes, f'{self.dtype} is not a valid PyTorch float data type.'
+        if '16' in str(self.dtype): 
+            long_message = f'The dtype {self.dtype} is typically used with GPU architectures. If you are using CPU, consider using 32 or 64-bit dtypes. \
+Certain operations may be casted to 32 or 64 bits to enhance numerical stability.'
 
-# %% ../nbs/01_polytope.ipynb 4
-@patch
-def _send_to_device_(self:Polytope, device:str=None):
-    self.A_in = self.A_in.to(device)
-    self.b_in = self.A_in.to(device)
-    
+            warnings.warn(long_message)
 
 # %% ../nbs/01_polytope.ipynb 5
 @patch
+def send_to_device(self:Polytope, device:str=None):
+    self.A_in = self.A_in.to(device)
+    self.b_in = self.b_in.to(device)
+    self.device = device
+
+# %% ../nbs/01_polytope.ipynb 6
+@patch
 def __str__(self:Polytope):
-    string = f'Numeric Precision (dtype) {self.dtype}'
+    string = f'Numeric Precision (dtype) {self.dtype}\n'
+    string = string + f'Device: {self.device}\n'
     string = string + f'A_in: {self.A_in.shape} \n'
     string = string + f'b_in: {self.b_in.shape}'
     return string
 
-# %% ../nbs/01_polytope.ipynb 6
+@patch
+def __repr__(self:Polytope):
+    return self.__str__()
+
+# %% ../nbs/01_polytope.ipynb 7
 class NFDPolytope(Polytope):
     
     def __init__(self, 
@@ -104,37 +119,98 @@ class NFDPolytope(Polytope):
                 b_in:Union[torch.Tensor, np.ndarray], 
                 A_eq:Union[torch.Tensor, np.ndarray], 
                 b_eq:Union[torch.Tensor, np.ndarray], 
-                dtype=torch.float32 # Default dtype for Non-Fully-Dimensioonal Polytopes is 32 bits
+                dtype=torch.float32, # Default dtype for Non-Fully-Dimensioonal Polytopes is 32 bits
+                copy:bool=False,
+                requires_grad:bool=False
                  ) -> None:
         
-        self._check_intra_constraint_dimension_(A_in,b_in,'Inequality')
-        self._check_intra_constraint_dimension_(A_eq,b_eq,'Equality')
+        self._check_intra_constraint_dimensions_(A_in,b_in,'Inequality')
+        self._check_intra_constraint_dimensions_(A_eq,b_eq,'Equality')
         self._check_inter_constraint_dimensions_(A_in, A_eq)
 
-        super.__init__(self, A_in, b_in, dtype)
+        super().__init__(A_in, b_in, dtype, copy, requires_grad)
         self.mE = A_eq.shape[0]
-        self.A_eq = self._process_tensor_or_array(A_eq,'A_eq')
-        self.b_eq = self._process_tensor_or_array(b_eq,'b_eq')
+        self.A_eq = self._process_tensor_or_array_(A_eq,'A_eq')
+        self.b_eq = self._process_tensor_or_array_(b_eq,'b_eq')
+        self.projection_matrix = None
         gc.collect()
         
         
     def _check_inter_constraint_dimensions_(self,A_in,A_eq):
         
-        assert(A_in.shape[0] == A_eq.shape[0]), f"Constraints have dimension mismatch: A_in has shape {A_in.shape} and  A_eq {A_eq.shape}."
+        assert(A_in.shape[1] == A_eq.shape[1]), f"Constraints have dimension mismatch: A_in has shape {A_in.shape} and  A_eq {A_eq.shape}."
         
         
-
-# %% ../nbs/01_polytope.ipynb 7
-@patch
-def _send_to_device_(self:NFDPolytope, device:str):
-    super._send_to_device_(device)
-    self.A_eq = self.A_eq.to(device)
-    self.b_eq = self.b_eq.to(device)
-    
 
 # %% ../nbs/01_polytope.ipynb 8
 @patch
+def send_to_device(self:NFDPolytope, device:str):
+    Polytope.send_to_device(self,device)
+    self.device = None
+    self.A_eq = self.A_eq.to(device)
+    self.b_eq = self.b_eq.to(device)
+    if self.projection_matrix is not None:
+        self.projection_matrix = self.projection_matrix.to(device)
+    self.device = device
+
+    
+
+# %% ../nbs/01_polytope.ipynb 9
+@patch
+def compute_projection_matrix(self:NFDPolytope, device:str, max_precision:bool=True):
+    if max_precision:
+        precision = torch.float64
+    else:
+        precision = self.dtype
+        
+    if ('cuda' not in device) & ('16' in str(precision)):
+        warnings.warn('Float16 precision was chosen for the polytope, but the "device=cpu" option is selected. Tensors will be temporarily cast to float32 for stability evaluation. If you wish to use float16 precision, please select "device=cuda".')
+        precision = torch.float32
+
+        
+    self.send_to_device(device)
+    
+    # Compute (A A')^(-1)
+    A_eq_t = torch.transpose(self.A_eq.to(precision), 0, 1)
+    A_eq_mm_A_eq_t = torch.matmul(self.A_eq.to(precision), A_eq_t.to(precision))
+    #ae_inv = torch.inverse(ae_aux)
+    
+    # Compute (A A')^(-1)A
+    la = torch.linalg.solve(A_eq_mm_A_eq_t.to(precision),self.A_eq.to(precision)).to(precision)
+
+    # Check numerical stability of (A A')^(-1) (AA') - I
+    est = torch.mm(la, A_eq_t)
+    est = torch.max(torch.abs(est - torch.eye(est.shape[0], device=device)))
+    print("Max non zero error for term (A A')^(-1)A: ", est)
+    del est
+
+    # Compute I - A'(A A')^(-1)A
+    #la = torch.matmul(aet, ae_inv)
+    projection_matrix = torch.matmul(A_eq_t.to(precision),la.to(precision)).to(self.dtype)
+    projection_matrix = torch.eye(projection_matrix.shape[0], device=device).to(self.dtype) - projection_matrix
+
+    # Free Memory
+    del A_eq_mm_A_eq_t
+    del A_eq_t
+    #del ae_inv
+    del la
+    gc.collect()
+    self.projection_matrix =  projection_matrix
+    if self.device is None:
+        self.send_to_device(device='cpu')
+    else:
+        self.send_to_device(device=self.device)
+        
+
+# %% ../nbs/01_polytope.ipynb 10
+@patch
 def __str__(self:NFDPolytope):
-    string = super.__str__()
-    string = string + f'A_eq: {self.A_eq.shape} \n b_eq: {self.b_eq.shape}'
+    string = Polytope.__str__(self)
+    string = string + f'\nA_eq: {self.A_eq.shape} \nb_eq: {self.b_eq.shape}'
+    if self.projection_matrix is not None:
+        string = string + f'\nProjection Matrix: {self.projection_matrix.shape}'
     return string
+
+@patch
+def __repr__(self:NFDPolytope):
+    return self.__str__()

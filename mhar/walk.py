@@ -27,7 +27,7 @@ def sample_inner_points(X0, z):
         I = X0.clone()
     return I
 
-# %% ../nbs/03_walk.ipynb 4
+# %% ../nbs/03_walk.ipynb 6
 def walk(
         polytope:Union[Polytope, NFDPolytope], # Polytope Object
         X0:torch.Tensor,    # Initial Interior point(s) of dim=(n,k).     
@@ -43,24 +43,30 @@ def walk(
         verbosity:int=1, # Verbosity of the execution
         ) -> None:
         
-    assert device in ['cpu', 'cuda'], print('The device is not correctly specified: ', device,
+    ## Check validity 
+    # Device
+    assert(device in ['cpu', 'cuda']), print('The device is not correctly specified: ', device,
                                         '\n Please choose cpu or cuda')
+    # X0 dimension
+    assert(X0.shape[0] == polytope.n)
     
-    # Set min and max values
+    ## Set min and max values
     min_ = torch.finfo(polytope.dtype).min + 2.0
     max_ = torch.finfo(polytope.dtype).max - 2.0
-    
     if verbosity > 1:
         print(f'Minimum number allowed {min_}')
         print(f'Maximum number allowed {max_}')
     
-    # Set seed
+    
+    ## Set seed
     random_gen = torch.Generator(device=device)
     if seed:
         random_gen.manual_seed(seed)
     else:
         random_gen.seed()
     
+    
+    ## Check Dimensions
     n = polytope.n
     mI = polytope.mI
     if isinstance(polytope, NFDPolytope) :
@@ -70,13 +76,25 @@ def walk(
     if verbosity >=1:
         print('n: ', n, '  mI:', mI, '  mE:', mE, '  z:', z)
         
+    
+    ## Compute/set thinning factor
     if thinning:
         pass
     else:
         thinning = int(n * n * n)
         if verbosity >= 1:
             print('Automatic Thinning factor: ', thinning)
+     
             
-    init_x0 = sample_inner_points(X0,z).to(device)
+    ## Prepare and send Matrices
+    init_x0 = sample_inner_points(X0,z).to(device)  
+    polytope.send_to_device(device)
     
+    
+    ## Iteration Loop
+    t = 1
+    burned = 0
+    dtype = polytope.dtype
+    while t <= T:
+        h = create_h(n, z, generator=random_gen, dtype=dtype,device=device)
     
