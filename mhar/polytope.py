@@ -28,7 +28,7 @@ class Polytope:
                  ) -> None:
         
         self.dtype = dtype
-        self.device = None
+        self.device = 'cpu' if A_in.get_device()==-1 else f'cuda:{A_in.get_device()}'
         
         self._check_dtype_()
         self._check_intra_constraint_dimensions_(A_in,b_in,'Inequality')
@@ -84,7 +84,7 @@ class Polytope:
 
     def _check_dtype_(self):
         valid_dtypes = (torch.float16, torch.float32, torch.float64)
-        assert self.dtype in valid_dtypes, f'{self.dtype} is not a valid PyTorch float data type.'
+        assert self.dtype in valid_dtypes, f'{self.dtype} is not a valid PyTorch float data type. Valid dtypes: {valid_dtypes}'
         if '16' in str(self.dtype): 
             long_message = f'The dtype {self.dtype} is typically used with GPU architectures. If you are using CPU, consider using 32 or 64-bit dtypes. \
 Certain operations may be casted to 32 or 64 bits to enhance numerical stability.'
@@ -97,6 +97,14 @@ def send_to_device(self:Polytope, device:str=None):
     self.A_in = self.A_in.to(device)
     self.b_in = self.b_in.to(device)
     self.device = device
+    
+@patch
+def cast_precision(self:Polytope, dtype=None):
+    if dtype is None:
+        dtype = self.dtype
+    self.A_in = self.A_in.to(dtype)
+    self.b_in = self.b_in.to(dtype)
+    self.dtype = dtype 
 
 # %% ../nbs/01_polytope.ipynb 6
 @patch
@@ -153,7 +161,15 @@ def send_to_device(self:NFDPolytope, device:str):
         self.projection_matrix = self.projection_matrix.to(device)
     self.device = device
 
-    
+@patch
+def cast_precision(self:NFDPolytope, dtype=None):
+    Polytope.cast_precision(self, dtype)
+    self.dtype = None
+    self.A_eq = self.A_eq.to(dtype)
+    self.b_eq = self.b_eq.to(dtype)
+    if self.projection_matrix is not None:
+        self.projection_matrix = self.projection_matrix.to(dtype)
+    self.dtype = dtype 
 
 # %% ../nbs/01_polytope.ipynb 9
 @patch
@@ -167,7 +183,7 @@ def compute_projection_matrix(self:NFDPolytope, device:str, max_precision:bool=T
         warnings.warn('Float16 precision was chosen for the polytope, but the "device=cpu" option is selected. Tensors will be temporarily cast to float32 for stability evaluation. If you wish to use float16 precision, please select "device=cuda".')
         precision = torch.float32
 
-        
+    original_device = self.device
     self.send_to_device(device)
     
     # Compute (A A')^(-1)
@@ -196,10 +212,7 @@ def compute_projection_matrix(self:NFDPolytope, device:str, max_precision:bool=T
     del la
     gc.collect()
     self.projection_matrix =  projection_matrix
-    if self.device is None:
-        self.send_to_device(device='cpu')
-    else:
-        self.send_to_device(device=self.device)
+    self.send_to_device(original_device)
         
 
 # %% ../nbs/01_polytope.ipynb 10

@@ -19,4 +19,4 @@ def custom_warning(message, category, filename, lineno, file=None, line=None):
     print(formatted_message)
 
 warnings.showwarning = custom_warning
-
+warnings.filterwarnings("always")

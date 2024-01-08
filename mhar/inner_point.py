@@ -24,12 +24,23 @@ def ChebyshevCenter(
                     device='cpu',
                     solver_precision=np.float64
                     ): 
-    ## Equality
+    ## Set Device
     polytope_device = polytope.device
-    polytope.send_to_device(device)              
-    A_in = polytope.A_in.numpy().astype(solver_precision)
-    b_in = polytope.b_in.numpy().astype(solver_precision)
+    polytope.send_to_device('cpu')
     
+    ## Set Precision
+    if '64' in str(solver_precision):
+        solver_precision_tensor = torch.float64
+    elif '32' in str(solver_precision):
+        solver_precision_tensor = torch.float32
+    elif '16' in str(solver_precision):
+        solver_precision_tensor = torch.float16
+    original_precision = polytope.dtype
+    polytope.cast_precision(solver_precision_tensor)
+    
+                  
+    A_in = polytope.A_in.numpy()
+    b_in = polytope.b_in.numpy()
     A_in_norm = np.matrix(np.sum(A_in ** 2., axis=-1) ** (1. / 2.))
     # Create new restriction matrices
     A_in_norm = np.concatenate((A_in, A_in_norm.transpose()), axis=1)
@@ -40,14 +51,14 @@ def ChebyshevCenter(
     ## Inequality
     if isinstance(polytope,NFDPolytope):
         mE = polytope.mE
-        A_eq = polytope.A_eq.numpy().astype(solver_precision)
+        A_eq = polytope.A_eq.numpy()
         # The equality restrictions have zero norm. Is transposed to keep order
         A_eq_norm = np.zeros((1, A_eq.shape[0]))
         # Create new restriction matrices
         A_eq_norm = np.concatenate((A_eq, A_eq_norm.transpose()), axis=1)
         del A_eq
         gc.collect()
-        b_eq = polytope.b_eq.numpy().astype(solver_precision)
+        b_eq = polytope.b_eq.numpy()
     else:
         mE=0
         A_eq_norm = None
@@ -59,7 +70,7 @@ def ChebyshevCenter(
         A_eq=A_eq_norm,
         b_eq=b_eq,
         bounds = (lb, ub),
-        method= 'revised simplex')
+        method= 'highs')
 
     status = {0:'Optimization proceeding nominally.',
                 1: 'Iteration limit reached.',
@@ -70,7 +81,7 @@ def ChebyshevCenter(
     
     print('\nSimplex Status for the Chebyshev Center\n', status)
     
-    if ('cuda' not in device) & ('16' in str(polytope.dtype)):
+    if ('cuda' not in device) & ('16' in str(original_precision)):
         warnings.warn('Float16 precision was chosen for the polytope, but the "device=cpu" option is selected. Tensors will be temporarily cast to float32 for stability evaluation. If you wish to use float16 precision, please select "device=cuda".')
         dtype = torch.float32
     else:
@@ -78,13 +89,16 @@ def ChebyshevCenter(
     
     x0 = torch.tensor(np.array(r.x[:-1], ndmin=2).transpose(), dtype=dtype).to(device)
     x0_in = torch.matmul(polytope.A_in.to(device).to(dtype), x0.to(device).to(dtype))
-    x0_eq = torch.matmul(polytope.A_eq.to(device).to(dtype), x0.to(device).to(dtype))
     b_in = torch.from_numpy(b_in).to(device).to(dtype)
     
     assert(torch.all(x0_in <= b_in )), f'Point {x0} does not satisfy A_inx <= b_in restrictions, it may have numerical inestability'
     if mE>0:
+        x0_eq = torch.matmul(polytope.A_eq.to(device).to(dtype), x0.to(device).to(dtype))
         assert(torch.all(torch.abs(x0_eq - b_eq) <= tolerance)), f'Point {x0} does not satisfy A_eqx = b_eq restrictions with tolerance {tolerance}, it may have numerical inestability'
-    polytope.send_to_device(polytope_device)              
     
-    return x0.to(polytope_device)
+    polytope.send_to_device(polytope_device)    
+    polytope.cast_precision(original_precision)
+              
+    
+    return x0.to(polytope_device).to(original_precision)
 
