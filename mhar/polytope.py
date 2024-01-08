@@ -135,6 +135,9 @@ class NFDPolytope(Polytope):
         self._check_intra_constraint_dimensions_(A_in,b_in,'Inequality')
         self._check_intra_constraint_dimensions_(A_eq,b_eq,'Equality')
         self._check_inter_constraint_dimensions_(A_in, A_eq)
+        
+        if '16' in str(dtype):
+            warnings.warn('Float16 precision was selected, since there are some equality restrictions a Projection matrix must be computed. Be sure to evaluate the numerical stability of the algorithm.')
 
         super().__init__(A_in, b_in, dtype, copy, requires_grad)
         self.mE = A_eq.shape[0]
@@ -173,46 +176,56 @@ def cast_precision(self:NFDPolytope, dtype=None):
 
 # %% ../nbs/01_polytope.ipynb 9
 @patch
-def compute_projection_matrix(self:NFDPolytope, device:str, max_precision:bool=True):
-    if max_precision:
-        precision = torch.float64
-    else:
-        precision = self.dtype
-        
-    if ('cuda' not in device) & ('16' in str(precision)):
-        warnings.warn('Float16 precision was chosen for the polytope, but the "device=cpu" option is selected. Tensors will be temporarily cast to float32 for stability evaluation. If you wish to use float16 precision, please select "device=cuda".')
-        precision = torch.float32
+def compute_projection_matrix(self:NFDPolytope, device:str, solver_precision=torch.float64):
 
+    ## Set Device
     original_device = self.device
     self.send_to_device(device)
     
+    ## Set Precision
+    if '64' in str(solver_precision):
+        solver_precision_tensor = torch.float64
+    elif '32' in str(solver_precision):
+        solver_precision_tensor = torch.float32
+    elif '16' in str(solver_precision):
+        solver_precision_tensor = torch.float16
+    original_precision = self.dtype
+    error_precision = self.dtype
+        
+    if ('cuda' not in device) & ('16' in str(original_precision)):
+        warnings.warn('Float16 precision was chosen for the polytope, but the "device=cpu" option is selected. Tensors will be temporarily cast to float32 for computing the Projection Matrix and stability evaluation. If you wish to use float16 precision, please select "device=cuda".')
+        solver_precision_tensor = torch.float32
+        error_precision = torch.float32
+    self.cast_precision(solver_precision_tensor)
+    
     # Compute (A A')^(-1)
-    A_eq_t = torch.transpose(self.A_eq.to(precision), 0, 1)
-    A_eq_mm_A_eq_t = torch.matmul(self.A_eq.to(precision), A_eq_t.to(precision))
-    #ae_inv = torch.inverse(ae_aux)
+    A_eq_t = torch.transpose(self.A_eq, 0, 1)
+    A_eq_mm_A_eq_t = torch.matmul(self.A_eq, A_eq_t)
     
     # Compute (A A')^(-1)A
-    la = torch.linalg.solve(A_eq_mm_A_eq_t.to(precision),self.A_eq.to(precision)).to(precision)
+    la = torch.linalg.solve(A_eq_mm_A_eq_t,self.A_eq)
 
     # Check numerical stability of (A A')^(-1) (AA') - I
-    est = torch.mm(la, A_eq_t)
-    est = torch.max(torch.abs(est - torch.eye(est.shape[0], device=device)))
-    print("Max non zero error for term (A A')^(-1)A: ", est)
+    
+    est = torch.mm(la.to(error_precision), A_eq_t.to(error_precision))
+    est = torch.max(torch.abs(est - torch.eye(est.shape[0], device=device).to(error_precision)))
+    print(f"Max non zero error for term (A A')^(-1)A at precision {error_precision}: ", est)
     del est
 
     # Compute I - A'(A A')^(-1)A
-    #la = torch.matmul(aet, ae_inv)
-    projection_matrix = torch.matmul(A_eq_t.to(precision),la.to(precision)).to(self.dtype)
-    projection_matrix = torch.eye(projection_matrix.shape[0], device=device).to(self.dtype) - projection_matrix
+    projection_matrix = torch.matmul(A_eq_t,la)
+    projection_matrix = torch.eye(projection_matrix.shape[0], device=device) - projection_matrix
 
     # Free Memory
     del A_eq_mm_A_eq_t
     del A_eq_t
-    #del ae_inv
     del la
     gc.collect()
     self.projection_matrix =  projection_matrix
-    self.send_to_device(original_device)
+        
+    self.send_to_device(original_device)    
+    self.cast_precision(original_precision)
+              
         
 
 # %% ../nbs/01_polytope.ipynb 10
