@@ -160,7 +160,7 @@ class NFDPolytope(Polytope):
         self._check_inter_constraint_dimensions_(A_in, A_eq)
         
         if '16' in str(dtype):
-            warnings.warn('Float16 precision was selected, since there are some equality restrictions a Projection matrix must be computed. Be sure to evaluate the numerical stability of the algorithm.')
+            warnings.warn('Float16 precision was selected, since there are some equality restrictions a Projection matrix must be computed. Be sure to evaluate the numerical stability of the algorithm. We suggest using float32 or bigger.')
 
         super().__init__(A_in, b_in, dtype, device,copy, requires_grad)
         self.mE = A_eq.shape[0]

@@ -123,7 +123,7 @@ def update_progress_bars(burned, thinning, t, T, new_t: bool = False):
         print(progress_burned, end='\n')
         print(progress_iid, end='\n')
         # Move cursor up two lines for the next update
-        sys.stdout.write("\033[F\033[F")
+        #sys.stdout.write("\033[F\033[F")
     else:
         # Print only the progress bar for burned samples
         print(progress_burned, end='\r')
