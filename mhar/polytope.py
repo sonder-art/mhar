@@ -23,12 +23,17 @@ class Polytope:
                 A_in:Union[torch.Tensor, np.ndarray], 
                 b_in:Union[torch.Tensor, np.ndarray], 
                 dtype=torch.float16,
+                device = None,
                 copy:bool=False,
                 requires_grad:bool=False
                  ) -> None:
         
         self.dtype = dtype
-        self.device = 'cpu' if A_in.get_device()==-1 else f'cuda:{A_in.get_device()}'
+        if device is None:
+            self.device = 'cpu' if A_in.get_device()==-1 else f'cuda:{A_in.get_device()}'
+        else:
+            self.device = device
+        self._assert_valid_device_(device=device)
         
         self._check_dtype_()
         self._check_intra_constraint_dimensions_(A_in,b_in,'Inequality')
@@ -90,6 +95,23 @@ class Polytope:
 Certain operations may be casted to 32 or 64 bits to enhance numerical stability.'
 
             warnings.warn(long_message)
+            
+    def _assert_valid_device_(self, device):
+        """
+        Asserts that the given device is valid in PyTorch.
+
+        Args:
+        device (str): The device to check, e.g., 'cuda:0', 'cpu'.
+        """
+        # Check if the device is 'cpu' or 'cuda'. If 'cuda', check if it's available
+        if device == 'cpu' or (device.startswith('cuda') and torch.cuda.is_available()):
+            # If device is cuda, additionally check if the specified index is valid
+            if device.startswith('cuda'):
+                device_index = int(device.split(':')[1]) if ':' in device else 0
+                assert device_index < torch.cuda.device_count(), "CUDA device index is out of range."
+        else:
+            raise AssertionError(f"Device '{device}' is not valid. Please choose 'cpu' or a valid 'cuda' device.")
+
 
 # %% ../nbs/01_polytope.ipynb 5
 @patch
@@ -128,6 +150,7 @@ class NFDPolytope(Polytope):
                 A_eq:Union[torch.Tensor, np.ndarray], 
                 b_eq:Union[torch.Tensor, np.ndarray], 
                 dtype=torch.float32, # Default dtype for Non-Fully-Dimensioonal Polytopes is 32 bits
+                device = None,
                 copy:bool=False,
                 requires_grad:bool=False
                  ) -> None:
@@ -139,7 +162,7 @@ class NFDPolytope(Polytope):
         if '16' in str(dtype):
             warnings.warn('Float16 precision was selected, since there are some equality restrictions a Projection matrix must be computed. Be sure to evaluate the numerical stability of the algorithm.')
 
-        super().__init__(A_in, b_in, dtype, copy, requires_grad)
+        super().__init__(A_in, b_in, dtype, device,copy, requires_grad)
         self.mE = A_eq.shape[0]
         self.A_eq = self._process_tensor_or_array_(A_eq,'A_eq')
         self.b_eq = self._process_tensor_or_array_(b_eq,'b_eq')
@@ -229,6 +252,14 @@ def compute_projection_matrix(self:NFDPolytope, device:str, solver_precision=tor
         
 
 # %% ../nbs/01_polytope.ipynb 10
+@patch
+def project_h(self:NFDPolytope, x):
+    assert(self.projection_matrix is not None), f'Projection Matrix has not been computed.'
+        
+    x_projected = torch.matmul(self.projection_matrix,x)
+    return x_projected
+
+# %% ../nbs/01_polytope.ipynb 11
 @patch
 def __str__(self:NFDPolytope):
     string = Polytope.__str__(self)

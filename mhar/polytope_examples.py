@@ -15,12 +15,13 @@ class Hypercube(Polytope):
     def __init__(self,
                  n:int=None,
                  dtype=torch.float16, 
+                 device=None,
                  copy: bool = False, 
                  requires_grad: bool = False) -> None:
-        
+        device = 'cpu' if device is None else device
         A_in = torch.cat((torch.eye(n), torch.eye(n) * -1.0), dim=0).to(dtype)
         b_in = torch.ones(2 * n, dtype=torch.float32).view(-1, 1)        
-        super().__init__(A_in, b_in, dtype, copy, requires_grad)
+        super().__init__(A_in, b_in, dtype,device, copy, requires_grad)
 
 # %% ../nbs/04_polytope_examples.ipynb 5
 class Simplex(NFDPolytope):
@@ -28,9 +29,10 @@ class Simplex(NFDPolytope):
     def __init__(self,
                  n:int=None,
                  dtype=torch.float16, 
+                 device=None,
                  copy: bool = False, 
                  requires_grad: bool = False) -> None:
-        
+        device = 'cpu' if device is None else device
         A_in = torch.eye(n).to(dtype) * -1.0
         b_in = torch.empty(n, 1, dtype=dtype)
         b_in.fill_(0.0)
@@ -41,4 +43,4 @@ class Simplex(NFDPolytope):
         b_eq = torch.empty(1, 1, dtype=dtype)
         b_eq.fill_(1.0) 
              
-        super().__init__(A_in, b_in, A_eq, b_eq,dtype, copy, requires_grad)
+        super().__init__(A_in, b_in, A_eq, b_eq,dtype, device,copy, requires_grad)
