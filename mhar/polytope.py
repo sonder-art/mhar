@@ -20,12 +20,12 @@ from . import warningss
 class Polytope:
     
     def __init__(self, 
-                A_in:Union[torch.Tensor, np.ndarray], 
-                b_in:Union[torch.Tensor, np.ndarray], 
-                dtype=torch.float16,
-                device = None,
-                copy:bool=False,
-                requires_grad:bool=False
+                A_in:Union[torch.Tensor, np.ndarray], # Inequality Restriction Matrix 
+                b_in:Union[torch.Tensor, np.ndarray], # Inequality Vector
+                dtype=torch.float16, # torch dtype
+                device = None, # device used cpu or cuda
+                copy:bool=False, # bool for creating a copy of the restrictions
+                requires_grad:bool=False # If we want to keep the gradient
                  ) -> None:
         
         self.dtype = dtype
@@ -229,7 +229,6 @@ def compute_projection_matrix(self:NFDPolytope, device:str, solver_precision=tor
     la = torch.linalg.solve(A_eq_mm_A_eq_t,self.A_eq)
 
     # Check numerical stability of (A A')^(-1) (AA') - I
-    
     est = torch.mm(la.to(error_precision), A_eq_t.to(error_precision))
     est = torch.max(torch.abs(est - torch.eye(est.shape[0], device=device).to(error_precision)))
     print(f"Max non zero error for term (A A')^(-1)A at precision {error_precision}: ", est)

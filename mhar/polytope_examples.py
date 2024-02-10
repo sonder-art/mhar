@@ -20,7 +20,7 @@ class Hypercube(Polytope):
                  requires_grad: bool = False) -> None:
         device = 'cpu' if device is None else device
         A_in = torch.cat((torch.eye(n), torch.eye(n) * -1.0), dim=0).to(dtype)
-        b_in = torch.ones(2 * n, dtype=torch.float32).view(-1, 1)        
+        b_in = torch.ones(2 * n, dtype=dtype).view(-1, 1)        
         super().__init__(A_in, b_in, dtype,device, copy, requires_grad)
 
 # %% ../nbs/04_polytope_examples.ipynb 5
