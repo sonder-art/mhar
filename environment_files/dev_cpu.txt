@@ -5,3 +5,4 @@ SciPy==1.11.4
 torch==2.1.2
 nbdev == 2.3.13
 tqdm
+twine

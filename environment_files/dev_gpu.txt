@@ -5,3 +5,4 @@ torch==2.1.2
 jupyterlab==4.0.10
 nbdev==2.3.13
 tqdm
+twine

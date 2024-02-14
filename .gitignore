@@ -140,3 +140,4 @@ cython_debug/
 # Images
 images/
 .ideas
+.pypirc
