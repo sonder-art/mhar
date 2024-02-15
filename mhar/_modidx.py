@@ -2,7 +2,7 @@
 
 d = { 'settings': { 'branch': 'released',
                 'doc_baseurl': '/mhar',
-                'doc_host': 'https://sonder-art.github.io',
+                'doc_host': 'https://uumami.github.io/',
                 'git_url': 'https://github.com/sonder-art/mhar',
                 'lib_path': 'mhar'},
   'syms': { 'mhar.core': {},
