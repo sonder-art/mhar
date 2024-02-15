@@ -14,7 +14,8 @@ It only works with linear inequality restrictions, it does not accept V-represen
 Peer Reviewed Paper: [Novel matrix hit and run for sampling polytopes and its GPU implementation](https://link.springer.com/article/10.1007/s00180-023-01411-y)  
 Free Peer Reviwed Paper: [ Free: Novel matrix hit and run for sampling polytopes and its GPU implementation](https://github.com/sonder-art/mhar/blob/released/mhar_modified-3.pdf)  
 Conference Presentation: [Youtube LACSC2021 conference](https://www.youtube.com/watch?v=o2CxnI6onts)  
-Github: [Repo](https://github.com/sonder-art/mhar)
+Github: [Repo](https://github.com/sonder-art/mhar)  
+MHAR pypi: [pip library](https://pypi.org/project/mhar/)
 
 ## What is Mentat-HAR?
 
